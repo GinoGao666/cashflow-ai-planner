@@ -1,91 +1,73 @@
-'use client';
+'use client'
 
-import { useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
 
   const handleLogin = async () => {
-    setLoading(true);
-    setMessage('');
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setMessage(error.message);
-    } else {
-      window.location.href = '/budget';
+    if (!email) {
+      setMessage('亲爱的，请先输入邮箱哦 💌')
+      return
     }
 
-    setLoading(false);
-  };
+    setLoading(true)
+    setMessage(null)
 
-  const handleRegister = async () => {
-    setLoading(true);
-    setMessage('');
-
-    const { error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      password,
-    });
+      options: {
+        emailRedirectTo: `${window.location.origin}/budget`,
+      },
+    })
+
+    setLoading(false)
 
     if (error) {
-      setMessage(error.message);
+      setMessage('登录失败了 😢，请稍后再试')
     } else {
-      setMessage('注册成功，请去邮箱确认 ✉️');
+      setMessage('亲爱的，我已经把登录链接发到你的邮箱啦 ✨')
     }
-
-    setLoading(false);
-  };
+  }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-pink-200 to-purple-300">
-      <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-xl space-y-4">
-        <h1 className="text-2xl font-bold text-center">💗 欢迎回来</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4">
+        <h1 className="text-xl font-bold text-center">
+          欢迎回来 💖
+        </h1>
+
+        <p className="text-sm text-gray-500 text-center">
+          输入邮箱，我们会给你发送一个安全的登录链接
+        </p>
 
         <input
           type="email"
-          placeholder="邮箱"
+          placeholder="你的邮箱地址"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border px-4 py-2 rounded"
+          className="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
         />
-
-        <input
-          type="password"
-          placeholder="密码"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border px-4 py-2 rounded"
-        />
-
-        {message && (
-          <p className="text-sm text-center text-red-500">{message}</p>
-        )}
 
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="w-full bg-pink-500 text-white py-2 rounded-lg"
+          className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
         >
-          登录
+          {loading ? '发送中…' : '发送登录链接'}
         </button>
 
-        <button
-          onClick={handleRegister}
-          disabled={loading}
-          className="w-full border py-2 rounded-lg"
-        >
-          注册
-        </button>
+        {message && (
+          <p className="text-sm text-center text-gray-600">
+            {message}
+          </p>
+        )}
       </div>
-    </main>
-  );
+    </div>
+  )
 }
