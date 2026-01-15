@@ -1,9 +1,38 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-type Expense = {
+export default function BudgetPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data } = await supabase.auth.getSession()
+
+      if (!data.session) {
+        router.replace('/login')
+      } else {
+        setLoading(false)
+      }
+    }
+
+    checkSession()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        正在确认你的身份哦，亲爱的…
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      {type Expense = {
   id: string
   amount: number
   category: string
@@ -115,3 +144,9 @@ export default function BudgetPage() {
     </div>
   )
 }
+}
+      <h1 className="text-xl font-bold">我的预算</h1>
+    </div>
+  )
+}
+
