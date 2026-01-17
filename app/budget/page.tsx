@@ -1,152 +1,111 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function BudgetPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const checkSession = async () => {
-      const { data } = await supabase.auth.getSession()
-
-      if (!data.session) {
-        router.replace('/login')
-      } else {
-        setLoading(false)
-      }
-    }
-
-    checkSession()
-  }, [router])
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-gray-500">
-        正在确认你的身份哦，亲爱的…
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      {type Expense = {
+type Budget = {
   id: string
-  amount: number
-  category: string
+  net_income: number
+  gross_income: number | null
   created_at: string
 }
 
 export default function BudgetPage() {
-  const [user, setUser] = useState<any>(null)
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [amount, setAmount] = useState('')
-  const [category, setCategory] = useState('餐饮')
+  const [budget, setBudget] = useState<Budget | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) {
-        window.location.href = '/'
+    const fetchBudget = async () => {
+      setLoading(true)
+
+      // 1️⃣ 获取当前登录用户
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (userError || !user) {
+        setError('未登录，请先登录')
+        setLoading(false)
         return
       }
-      setUser(data.user)
-      fetchExpenses(data.user.id)
-    })
+
+      // 2️⃣ 读取该用户最新的一条 budget
+      const { data, error } = await supabase
+        .from('budget')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        setError('还没有预算数据，请先完成收入设置')
+      } else {
+        setBudget(data)
+      }
+
+      setLoading(false)
+    }
+
+    fetchBudget()
   }, [])
 
-  async function fetchExpenses(userId: string) {
-    const { data } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-
-    setExpenses(data || [])
-    setLoading(false)
-  }
-
-  async function addExpense() {
-    if (!amount) return
-
-    await supabase.from('expenses').insert({
-      user_id: user.id,
-      amount: Number(amount),
-      category
-    })
-
-    setAmount('')
-    fetchExpenses(user.id)
-  }
+  // ===== UI 状态处理 =====
 
   if (loading) {
     return <div className="p-6">加载中...</div>
   }
 
+  if (error) {
+    return (
+      <div className="p-6 space-y-4">
+        <p className="text-red-500">{error}</p>
+        <a
+          href="/setup/income"
+          className="text-blue-600 underline"
+        >
+          去设置收入 →
+        </a>
+      </div>
+    )
+  }
+
+  if (!budget) {
+    return null
+  }
+
+  // ===== 正常展示 =====
+
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
+    <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">
-        亲爱的，今天花了多少钱？ 💸
+        亲爱的，这是你本期可以安心使用的钱 💛
       </h1>
 
+      <div className="rounded-xl bg-gray-100 p-6">
+        <p className="text-sm text-gray-500">本期可支配金额</p>
+        <p className="text-3xl font-semibold">
+          ¥ {budget.net_income.toLocaleString()}
+        </p>
+      </div>
+
       <div className="space-y-2">
-        <input
-          type="number"
-          placeholder="输入金额"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="w-full border p-2 rounded"
-        />
-
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full border p-2 rounded"
+        <a
+          href="/expenses/new"
+          className="block w-full rounded-lg bg-black py-3 text-center text-white"
         >
-          <option>餐饮</option>
-          <option>交通</option>
-          <option>购物</option>
-          <option>娱乐</option>
-          <option>其他</option>
-        </select>
+          记录一笔花费
+        </a>
 
-        <button
-          onClick={addExpense}
-          className="w-full bg-black text-white py-2 rounded"
+        <a
+          href="/setup/income"
+          className="block text-center text-sm text-gray-500 underline"
         >
-          记录这一笔
-        </button>
-      </div>
-
-      <div>
-        <h2 className="font-semibold mb-2">你的最近支出</h2>
-
-        {expenses.length === 0 && (
-          <div className="text-gray-500">
-            还没有记录，开始第一笔吧 🌱
-          </div>
-        )}
-
-        <ul className="space-y-2">
-          {expenses.map((e) => (
-            <li
-              key={e.id}
-              className="flex justify-between border-b pb-1"
-            >
-              <span>{e.category}</span>
-              <span>¥ {e.amount}</span>
-            </li>
-          ))}
-        </ul>
+          修改收入设置
+        </a>
       </div>
     </div>
   )
 }
-}
-      <h1 className="text-xl font-bold">我的预算</h1>
-    </div>
-  )
-}
-
