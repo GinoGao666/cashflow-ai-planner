@@ -5,8 +5,9 @@ import { supabase } from '@/lib/supabaseClient'
 
 type Budget = {
   id: string
-  net_income: number
+  user_id: string
   gross_income: number | null
+  net_income: number
   created_at: string
 }
 
@@ -18,6 +19,7 @@ export default function BudgetPage() {
   useEffect(() => {
     const fetchBudget = async () => {
       setLoading(true)
+      setError(null)
 
       // 1️⃣ 获取当前登录用户
       const {
@@ -31,28 +33,36 @@ export default function BudgetPage() {
         return
       }
 
-      // 2️⃣ 读取该用户最新的一条 budget
+      // 2️⃣ 查询该用户最近一条预算记录（不用 single）
       const { data, error } = await supabase
         .from('budget')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
 
       if (error) {
-        setError('还没有预算数据，请先完成收入设置')
-      } else {
-        setBudget(data)
+        setError('读取预算数据失败，请稍后重试')
+        setLoading(false)
+        return
       }
 
+      // 3️⃣ 真正没有数据的情况
+      if (!data || data.length === 0) {
+        setError('还没有预算数据，请先完成收入设置')
+        setLoading(false)
+        return
+      }
+
+      // 4️⃣ 正常拿到数据
+      setBudget(data[0])
       setLoading(false)
     }
 
     fetchBudget()
   }, [])
 
-  // ===== UI 状态处理 =====
+  // ===== UI 状态 =====
 
   if (loading) {
     return <div className="p-6">加载中...</div>
@@ -72,16 +82,14 @@ export default function BudgetPage() {
     )
   }
 
-  if (!budget) {
-    return null
-  }
+  if (!budget) return null
 
   // ===== 正常展示 =====
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">
-        亲爱的，这是你本期可以安心使用的钱 💛
+        💗 亲爱的，这是你本期可以安心使用的钱
       </h1>
 
       <div className="rounded-xl bg-gray-100 p-6">
@@ -89,9 +97,15 @@ export default function BudgetPage() {
         <p className="text-3xl font-semibold">
           ¥ {budget.net_income.toLocaleString()}
         </p>
+
+        {budget.gross_income && (
+          <p className="mt-2 text-sm text-gray-400">
+            税前收入：¥ {budget.gross_income.toLocaleString()}
+          </p>
+        )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <a
           href="/expenses/new"
           className="block w-full rounded-lg bg-black py-3 text-center text-white"
