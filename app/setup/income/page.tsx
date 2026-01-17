@@ -11,9 +11,8 @@ export default function IncomeSetupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // ⚠️ 先用一个「极简税后计算」
+  // 临时税后逻辑（后续可换）
   const calculateNetIncome = (gross: number) => {
-    // 临时逻辑：直接取 80%
     return Math.floor(gross * 0.8)
   }
 
@@ -35,34 +34,62 @@ export default function IncomeSetupPage() {
     } = await supabase.auth.getUser()
 
     if (userError || !user) {
-      setError('未登录，请重新登录')
+      setError('登录状态异常，请重新登录')
       setLoading(false)
       return
     }
 
     const netIncome = calculateNetIncome(gross)
 
-    // 2️⃣ 写入 budget 表
-    const { error: insertError } = await supabase.from('budget').insert({
-      user_id: user.id,
-      gross_income: gross,
-      net_income: netIncome,
-    })
+    // 2️⃣ 先检查是否已有 budget（防止重复）
+    const { data: existing } = await supabase
+      .from('budget')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single()
 
-    if (insertError) {
-      setError('保存失败，请稍后再试')
+    let saveError = null
+
+    if (existing) {
+      // 更新
+      const { error } = await supabase
+        .from('budget')
+        .update({
+          gross_income: gross,
+          net_income: netIncome,
+        })
+        .eq('user_id', user.id)
+
+      saveError = error
+    } else {
+      // 新建
+      const { error } = await supabase
+        .from('budget')
+        .insert({
+          user_id: user.id,
+          gross_income: gross,
+          net_income: netIncome,
+        })
+
+      saveError = error
+    }
+
+    if (saveError) {
+      console.error(saveError)
+      setError('收入保存失败，请稍后再试')
       setLoading(false)
       return
     }
 
-    // 3️⃣ 跳转到 budget 页面
-    router.push('/budget')
+    // 3️⃣ 成功 → 进入 budget
+    router.replace('/budget')
   }
 
   return (
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold">
-        亲爱的，先告诉我你的税前收入 💼
+        亲爱的，先告诉我你的税前月收入 💼
       </h1>
 
       <div className="space-y-2">
