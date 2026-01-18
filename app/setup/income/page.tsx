@@ -1,123 +1,94 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
-export default function IncomeSetupPage() {
+export default function IncomePage() {
   const router = useRouter()
-
-  const [grossIncome, setGrossIncome] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [gross, setGross] = useState('')
+  const [net, setNet] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  // 临时税后逻辑（后续可换）
-  const calculateNetIncome = (gross: number) => {
-    return Math.floor(gross * 0.8)
+  useEffect(() => {
+    const checkLogin = async () => {
+      const { data } = await supabase.auth.getUser()
+      if (!data.user) router.replace('/login')
+    }
+    checkLogin()
+  }, [router])
+
+  const calculate = () => {
+    const g = Number(gross)
+    if (!g) return
+    setNet(Math.floor(g * 0.8))
   }
 
-  const handleSubmit = async () => {
-    setError(null)
-
-    const gross = Number(grossIncome)
-    if (!gross || gross <= 0) {
-      setError('请输入正确的税前收入')
-      return
-    }
-
+  const save = async () => {
+    if (!net) return
     setLoading(true)
 
-    // 1️⃣ 获取当前用户
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    const { data } = await supabase.auth.getUser()
+    const user = data.user
 
-    if (userError || !user) {
-      setError('登录状态异常，请重新登录')
+    if (!user) {
+      setError('登录失效')
       setLoading(false)
       return
     }
 
-    const netIncome = calculateNetIncome(gross)
+    await supabase.from('budget').delete().eq('user_id', user.id)
 
-    // 2️⃣ 先检查是否已有 budget（防止重复）
-    const { data: existing } = await supabase
-      .from('budget')
-      .select('id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .single()
+    const { error } = await supabase.from('budget').insert({
+      user_id: user.id,
+      gross_income: Number(gross),
+      net_income: net,
+    })
 
-    let saveError = null
+    setLoading(false)
 
-    if (existing) {
-      // 更新
-      const { error } = await supabase
-        .from('budget')
-        .update({
-          gross_income: gross,
-          net_income: netIncome,
-        })
-        .eq('user_id', user.id)
-
-      saveError = error
+    if (error) {
+      setError('保存失败')
     } else {
-      // 新建
-      const { error } = await supabase
-        .from('budget')
-        .insert({
-          user_id: user.id,
-          gross_income: gross,
-          net_income: netIncome,
-        })
-
-      saveError = error
+      router.replace('/budget')
     }
-
-    if (saveError) {
-      console.error(saveError)
-      setError('收入保存失败，请稍后再试')
-      setLoading(false)
-      return
-    }
-
-    // 3️⃣ 成功 → 进入 budget
-    router.replace('/budget')
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">
-        亲爱的，先告诉我你的税前月收入 💼
-      </h1>
+    <div className="p-6 max-w-md mx-auto space-y-4">
+      <h1 className="text-xl font-bold">输入税前月收入</h1>
 
-      <div className="space-y-2">
-        <label className="text-sm text-gray-600">
-          税前月收入（元）
-        </label>
-        <input
-          type="number"
-          value={grossIncome}
-          onChange={(e) => setGrossIncome(e.target.value)}
-          className="w-full rounded-lg border px-4 py-3"
-          placeholder="例如 20000"
-        />
-      </div>
-
-      {error && <p className="text-red-500">{error}</p>}
+      <input
+        type="number"
+        className="w-full border rounded px-3 py-2"
+        placeholder="例如 20000"
+        value={gross}
+        onChange={(e) => setGross(e.target.value)}
+      />
 
       <button
-        onClick={handleSubmit}
-        disabled={loading}
-        className="w-full rounded-lg bg-black py-3 text-white disabled:opacity-50"
+        onClick={calculate}
+        className="w-full bg-gray-800 text-white py-2 rounded"
       >
-        {loading ? '保存中...' : '保存并进入预算'}
+        计算税后收入
       </button>
 
-      <p className="text-xs text-gray-400">
-        税后计算逻辑后续可优化，这里先保证流程正确
-      </p>
+      {net && (
+        <>
+          <p className="text-lg">税后约：¥ {net}</p>
+
+          <button
+            onClick={save}
+            disabled={loading}
+            className="w-full bg-black text-white py-2 rounded"
+          >
+            {loading ? '保存中...' : '进入月度预算规划'}
+          </button>
+        </>
+      )}
+
+      {error && <p className="text-red-500">{error}</p>}
     </div>
   )
 }

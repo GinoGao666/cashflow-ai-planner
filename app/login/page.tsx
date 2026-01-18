@@ -1,18 +1,16 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleLogin = async () => {
+  const login = async () => {
     if (!email) {
-      setMessage('亲爱的，请先输入邮箱哦 💌')
+      setMessage('请输入邮箱')
       return
     }
 
@@ -22,50 +20,41 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/budget`,
+        emailRedirectTo: `${window.location.origin}/setup/income`,
       },
     })
 
     setLoading(false)
 
     if (error) {
-      setMessage('登录失败了 😢，请稍后再试')
+      setMessage('登录失败，请稍后再试')
     } else {
-      setMessage('亲爱的，我已经把登录链接发到你的邮箱啦 ✨')
+      setMessage('登录链接已发送至邮箱')
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow p-6 space-y-4">
-        <h1 className="text-xl font-bold text-center">
-          欢迎回来 💖
-        </h1>
-
-        <p className="text-sm text-gray-500 text-center">
-          输入邮箱，我们会给你发送一个安全的登录链接
-        </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="bg-white p-6 rounded-xl shadow w-full max-w-sm space-y-4">
+        <h1 className="text-xl font-bold text-center">邮箱登录</h1>
 
         <input
-          type="email"
-          placeholder="你的邮箱地址"
+          className="w-full border rounded px-3 py-2"
+          placeholder="你的邮箱"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded px-3 py-2 focus:outline-none focus:ring"
         />
 
         <button
-          onClick={handleLogin}
+          onClick={login}
           disabled={loading}
-          className="w-full bg-black text-white rounded py-2 disabled:opacity-50"
+          className="w-full bg-black text-white py-2 rounded"
         >
-          {loading ? '发送中…' : '发送登录链接'}
+          {loading ? '发送中...' : '发送登录链接'}
         </button>
 
         {message && (
-          <p className="text-sm text-center text-gray-600">
-            {message}
-          </p>
+          <p className="text-sm text-center text-gray-500">{message}</p>
         )}
       </div>
     </div>
